@@ -1,0 +1,4 @@
+tkcalendar
+pandas
+fpdf
+Pillow
