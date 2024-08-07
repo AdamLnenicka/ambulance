@@ -1,11 +1,18 @@
+import os
 import tkinter as tk
 from tkinter import ttk, messagebox
 from tkcalendar import DateEntry
 import pandas as pd
 from fpdf import FPDF
 import datetime
-import os
 from PIL import Image, ImageTk, ImageOps
+
+# Získání aktuálního adresáře skriptu
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Cesty k souborům
+doctors_file = os.path.join(script_dir, 'doktoři.txt')
+image_file = os.path.join(script_dir, 'grandma.png')
 
 # Generování rozpisu
 def generovat_rozpis():
@@ -17,7 +24,7 @@ def generovat_rozpis():
 # Načítání seznamu doktorů
 def nacti_doktory():
     try:
-        with open('doktoři.txt', 'r', encoding='utf-8') as file:
+        with open(doctors_file, 'r', encoding='utf-8') as file:
             return [line.strip() for line in file.readlines()]
     except FileNotFoundError:
         messagebox.showerror("Chyba", "Soubor 'doktoři.txt' nebyl nalezen.")
@@ -107,7 +114,7 @@ doctors = nacti_doktory()
 # Hlavní okno
 root = tk.Tk()
 root.title("Aplikace pro ambulanci")
-root.geometry("1200x1000")
+root.geometry("1250x1000")
 
 # Frame pro základní informace
 frame_info = ttk.Frame(root, padding="10")
@@ -244,7 +251,7 @@ zmensit_btn.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
 
 # Načtení obrázku a jeho zobrazení
 try:
-    image = Image.open("grandma.png")  # Změňte na správnou cestu k obrázku, pokud je potřeba
+    image = Image.open(image_file)  # Změňte na správnou cestu k obrázku, pokud je potřeba
     image = image.resize((200, 200), Image.LANCZOS)
     
     # Vytvoření barevného pozadí odpovídajícího barvě okna
