@@ -6,8 +6,8 @@ Tato aplikace umožňuje spravovat rozpis doktorů v ambulanci.
 
 1. Stáhněte si repozitář:
     ```bash
-    git clone https://github.com/uzivatel/ambulance-app.git
-    cd ambulance-app
+    git clone https://github.com/adamlnenicka/ambulance.git
+    cd ambulance
     ```
 
 2. Spusťte instalační skript:
