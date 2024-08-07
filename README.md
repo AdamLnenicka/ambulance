@@ -12,7 +12,7 @@ Tato aplikace umožňuje spravovat rozpis doktorů v ambulanci.
 
 2. Spusťte instalační skript:
     ```bash
-    bash install.sh
+    bash install.bat
     ```
 
 3. Po dokončení instalace najdete zástupce na ploše.
