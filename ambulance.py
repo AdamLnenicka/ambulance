@@ -11,8 +11,7 @@ from PIL import Image, ImageTk, ImageOps
 def generovat_rozpis():
     aktualizovat_rozpis()
     uloz_do_pdf(rozpis_data)
-    uloz_text_do_souboru()
-    uloz_nepritomnosti_do_souboru()
+    uloz_text_do_souboru()  # Uložení textového rozpisu pouze při generování PDF
 
 # Načítání seznamu doktorů
 def nacti_doktory():
@@ -26,49 +25,69 @@ def nacti_doktory():
 # Zobrazení posledního rozpisu
 def zobrazit_posledni():
     try:
-        nacti_text_ze_souboru()
+        nacti_text_ze_souboru()  # Načte poslední uložený rozpis
     except Exception as e:
         messagebox.showerror("Chyba", f"Nelze načíst poslední rozpis: {e}")
 
 # Načtení textového rozpisu ze souboru
 def nacti_text_ze_souboru():
+    global absences
     try:
         with open('rozpis.txt', 'r', encoding='utf-8') as file:
             text.delete('1.0', tk.END)
-            text.insert(tk.END, file.read())
-        nacti_nepritomnosti_ze_souboru()
+            content = file.read()
+            text.insert(tk.END, content)
+            
+            # Parsování rozpisu pro obnovení absencí
+            lines = content.splitlines()
+            header = lines[0].strip().split()  # První řádek s názvy doktorů a sloupce "Slouží"
+            doctors_from_file = header[1:-1]  # Jména doktorů bez sloupce Datum a Slouží
+            
+            for line in lines[1:]:  # Přeskakujeme hlavičku
+                if len(line.strip()) == 0:
+                    continue  # Přeskočíme prázdné řádky
+
+                # Rozdělení řádku na základě pevné šířky
+                date_str = line[:6].strip()  # Datum je prvních 6 znaků
+                try:
+                    date = datetime.datetime.strptime(date_str, "%d.%m.").replace(year=datetime.date.today().year).date()
+                except ValueError:
+                    continue  # Pokud datum není správně naformátováno, přeskočíme tento řádek
+
+                if date not in absences:
+                    absences[date] = {}
+
+                # Přiřazení hodnot doktorům
+                for i, doctor in enumerate(doctors_from_file):
+                    start_index = 15 + i * 10  # Start index pro každého doktora
+                    end_index = start_index + 10  # Konec indexu pro každého doktora
+                    absence_value = line[start_index:end_index].strip()
+                    absences[date][doctor] = absence_value if absence_value else ""
+                
+                # Zpracování hodnoty sloupce "Slouží"
+                slouzi_value = line[-10:].strip()
+                absences[date]['Slouží'] = slouzi_value
+
+            # Výpis obsahu proměnné absences pro kontrolu
+            print("Po načtení souboru 'rozpis.txt':")
+            for date, absence in absences.items():
+                print(f"{date}: {absence}")
+                
     except FileNotFoundError:
         messagebox.showinfo("Info", "Žádný uložený rozpis nebyl nalezen.")
 
+
+
+
 # Uložení textového rozpisu do souboru
-def uloz_text_do_souboru():
-    with open('rozpis.txt', 'w', encoding='utf-8') as file:
-        file.write(text.get('1.0', tk.END))
-
-# Načtení nepřítomností ze souboru
-def nacti_nepritomnosti_ze_souboru():
-    global absences
-    absences = {}
-    try:
-        with open('nepritomnosti.txt', 'r', encoding='utf-8') as file:
-            for line in file:
-                date_str, doctor, reason = line.strip().split(',')
-                date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
-                if date not in absences:
-                    absences[date] = {}
-                absences[date][doctor] = reason
-    except FileNotFoundError:
-        pass
-
-# Uložení nepřítomností do souboru
-def uloz_nepritomnosti_do_souboru():
-    with open('nepritomnosti.txt', 'w', encoding='utf-8') as file:
-        for date in absences:
-            for doctor in absences[date]:
-                file.write(f"{date},{doctor},{absences[date][doctor]}\n")
-
-# Uložení rozpisu do PDF
 def uloz_do_pdf(data):
+    # Získání aktuálního datumu a času ve formátu den.mesic.rok_hodina:minuta:vterina
+    current_time = datetime.datetime.now().strftime("%d.%m.%Y_%H-%M-%S")
+    
+    # Vytvoření názvu souboru s datem a časem
+    pdf_filename = f"rozpis_{current_time}.pdf"
+    
+    # Generování PDF
     pdf = FPDF(format='A4')
     pdf.add_page()
     pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
@@ -89,17 +108,43 @@ def uloz_do_pdf(data):
     # Levý sloupec: dny v měsíci
     for date in data:
         day_str = date.strftime("%d.%m.") + " " + days[date.weekday()]
-        pdf.cell(cell_width, 8, day_str, border=1)
+        
+        # Nastavení šedého pozadí pro víkendy
+        if date.weekday() >= 5:
+            pdf.set_fill_color(211, 211, 211)  # Světle šedá barva pro víkendy
+        else:
+            pdf.set_fill_color(255, 255, 255)  # Bílá barva pro běžné dny
+        
+        pdf.cell(cell_width, 8, day_str, border=1, fill=True)
+        
         count_slouzi = 0
         for doctor in doctors:
+            # Nastavení šedého pozadí pro celý řádek o víkendech
+            if date.weekday() >= 5:
+                pdf.set_fill_color(211, 211, 211)  # Světle šedá barva
+            elif doctor == "Jára":  # Šedá barva pro sloupec Jára
+                pdf.set_fill_color(211, 211, 211)  # Světle šedá barva
+            else:
+                pdf.set_fill_color(255, 255, 255)  # Bílá barva
+            
             if doctor in data[date] and data[date][doctor] == "":
                 count_slouzi += 1
-            pdf.cell(cell_width, 8, data[date].get(doctor, ""), border=1, align='C')
-        pdf.cell(cell_width, 8, str(count_slouzi), border=1, align='C')
+            pdf.cell(cell_width, 8, data[date].get(doctor, ""), border=1, align='C', fill=True)
+        
+        # Nastavení barvy zpět pro buňku "Slouží"
+        pdf.set_fill_color(255, 255, 255)
+        pdf.cell(cell_width, 8, str(count_slouzi), border=1, align='C', fill=True)
         pdf.ln(8)
     
-    pdf.output("rozpis.pdf")
-    messagebox.showinfo("Info", "Rozpis byl úspěšně uložen jako rozpis.pdf")
+    # Přidání popisku pod tabulku
+    pdf.ln(5)  # Přidání menšího prázdného řádku
+    pdf.set_font("DejaVu", size=8)
+    popisek = "Popis symbolů absence: D - Dovolená, S - Po službě, X - Absence, B - Bronchoskopie"
+    pdf.cell(0, 10, popisek, ln=True, align='C')
+    
+    # Uložení souboru s dynamickým názvem
+    pdf.output(pdf_filename)
+    messagebox.showinfo("Info", f"Rozpis byl úspěšně uložen jako {pdf_filename}")
 
 # Načtení doktorů
 doctors = nacti_doktory()
@@ -107,7 +152,7 @@ doctors = nacti_doktory()
 # Hlavní okno
 root = tk.Tk()
 root.title("Aplikace pro ambulanci")
-root.geometry("1200x1000")
+root.geometry("1250x1000")
 
 # Frame pro základní informace
 frame_info = ttk.Frame(root, padding="10")
@@ -154,14 +199,23 @@ def pridat_nepritomnost():
             if current_date not in absences:
                 absences[current_date] = {}
             absences[current_date][doctor] = reason
+            
+            if current_date in rozpis_data:
+                rozpis_data[current_date][doctor] = reason
+            else:
+                rozpis_data[current_date] = {doctor: reason}
+                
             current_date += datetime.timedelta(days=1)
         messagebox.showinfo("Info", f"Nepřítomnost doktora {doctor} byla přidána od {start_date} do {end_date}.")
+        print("Po přidání nepřítomnosti:")
+        for date, absence in absences.items():
+            print(f"{date}: {absence}")
         aktualizovat_rozpis(start_date.month)
-        uloz_nepritomnosti_do_souboru()
     else:
         messagebox.showwarning("Varování", "Vyberte doktora, datum a důvod nepřítomnosti.")
 
-# Odstranění nepřítomnosti
+
+
 def odstranit_nepritomnost():
     doctor = doctor_combo.get()
     start_date = start_date_entry.get_date()
@@ -176,7 +230,6 @@ def odstranit_nepritomnost():
             current_date += datetime.timedelta(days=1)
         messagebox.showinfo("Info", f"Nepřítomnost doktora {doctor} byla odstraněna od {start_date} do {end_date}.")
         aktualizovat_rozpis(start_date.month)
-        uloz_nepritomnosti_do_souboru()
     else:
         messagebox.showwarning("Varování", "Vyberte doktora a datum.")
 
@@ -219,7 +272,6 @@ def aktualizovat_velikost_textu():
     start_date_label.configure(font=new_font)
     start_date_entry.configure(font=new_font)
     end_date_label.configure(font=new_font)
-    end_date_entry.configure(font=new_font)
     reason_label.configure(font=new_font)
     for widget in frame_info.winfo_children():
         if isinstance(widget, ttk.Radiobutton):
@@ -289,27 +341,50 @@ def center_text(text, width):
         return " " * padding + text + " " * (width - len(text) - padding)
     return text
 
+
+# Inicializace globální proměnné rozpis_data
+rozpis_data = {}
+
 def aktualizovat_rozpis(zobrazit_mesic=None):
     global rozpis_data
-    # Nastavení na následující měsíc
     today = datetime.date.today()
     first_day_next_month = (today.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
     start_date = first_day_next_month
     end_date = (start_date + datetime.timedelta(days=32)).replace(day=1) - datetime.timedelta(days=1)
     dates = pd.date_range(start_date, end_date).to_pydatetime()
-    
-    rozpis_data = {date.date(): {doctor: "" for doctor in doctors} for date in dates}
-    
-    for date in absences:
-        if date in rozpis_data:
-            for doctor in absences[date]:
-                rozpis_data[date][doctor] = absences[date][doctor]
+
+    for date in dates:
+        date_only = date.date()
+        if date_only not in rozpis_data:
+            rozpis_data[date_only] = {}
+        for doctor in doctors:
+            if date_only in absences and doctor in absences[date_only]:
+                rozpis_data[date_only][doctor] = absences[date_only][doctor]
+            elif doctor not in rozpis_data[date_only]:
+                rozpis_data[date_only][doctor] = ""
+
+    # Výpis obsahu proměnné rozpis_data
+    print("Po aktualizaci rozpisu:")
+    for date, data in rozpis_data.items():
+        print(f"{date}: {data}")
+
+
+    # Zachováme stará data a přidáme nová
+    for date in dates:
+        date_only = date.date()  # Konverze datetime na date
+        if date_only not in rozpis_data:
+            rozpis_data[date_only] = {}
+        for doctor in doctors:
+            if date_only in absences and doctor in absences[date_only]:
+                rozpis_data[date_only][doctor] = absences[date_only][doctor]
+            elif doctor not in rozpis_data[date_only]:
+                rozpis_data[date_only][doctor] = ""
     
     # Zobrazení rozpisu
     text.delete('1.0', tk.END)
     header = "Datum".ljust(15) + "".join([center_text(d, 10) for d in doctors]) + center_text("Slouží", 10)
     text.insert(tk.END, header + "\n", "big_font")
-    for date in rozpis_data:
+    for date in sorted(rozpis_data):
         if zobrazit_mesic is None or date.month == zobrazit_mesic:
             day_str = date.strftime("%d.%m.") + " " + days[date.weekday()]
             if date.weekday() >= 5:  # Víkendy
@@ -323,7 +398,7 @@ def aktualizovat_rozpis(zobrazit_mesic=None):
                       ("big_font", "jara") if doctor == "Jára" else "big_font"
                 if doctor in rozpis_data[date] and rozpis_data[date][doctor] == "":
                     count_slouzi += 1
-                text.insert(tk.END, center_text(rozpis_data[date][doctor], 10), tag)
+                text.insert(tk.END, center_text(rozpis_data[date].get(doctor, ""), 10), tag)
             text.insert(tk.END, center_text(str(count_slouzi), 10), "big_font")
             text.insert(tk.END, "\n")
 
