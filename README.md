@@ -42,11 +42,15 @@ Tato aplikace umožňuje spravovat rozpis doktorů v ambulanci.
 ## **Update 1**
 Opravy:
 1) Odstraněno informační okno při zadání/odstranění nepřítomnosti.
-2) Pro zadání/odstranění jednodenní nepřítomnosti stačí zadat datum dne v poli `Datum od`. 
+2) Pro zadání/odstranění jednodenní nepřítomnosti stačí zadat datum dne v poli `Datum od`.
+3) Opraveno neproporcionální zvětšovaní, zmenšování textu v různých elementech programu při využití tlačítek. Aby ukázka rozpisu zůstala přehledná, je akorát potřeba si při zvětšení textu roztáhnout aplikační okno. 
 
 Nové funkce:
 1) Přidáno tlačítko `Reset datum do` pro reset datumu do (Jelikož standardní mechanismus kalendáře neumožňuje přímo nastavit datum na None pomocí interakce, musíme přidat tlačítko nebo jiný mechanismus pro explicitní resetování).
-2) Přidána funkcionalita aplikace, která umožňuje automaticky generovat záznamy absencí pro každého doktora na základě specifikovaných dnů v souboru `doktoři.txt`.Formát: Soubor `doktoři.txt` má nyní řádky ve formátu jako `JménoDoktora Dny`, kde `Dny` jsou volitelné a jsou to čísla dnů v týdnu, kdy je doktor neustále nepřítomný z důvodu absence.
+2) Přidána funkcionalita aplikace, která umožňuje automaticky generovat záznamy absencí pro každého doktora na základě specifikovaných dnů v souboru `doktoři.txt`. Formát: Soubor `doktoři.txt` má nyní řádky ve formátu jako `JménoDoktora Dny`, kde `Dny` jsou volitelné a jsou to čísla dnů v týdnu, kdy je doktor neustále nepřítomný z důvodu absence.
 Např. řádek `Jára 345` znamená, že Jára bude chybět každou středu, čtvrtek a pátek v měsíci z důvodu absence.
-3) Přidána nabídka pro výběr měsíce.
+3) Přidána nabídka pro výběr měsíce. Defaultní je aktuální měsíc. Předdefinované absence se automaticky aplikují na vybraný měsíc.
 4) Přidána funkcionalita pro výběr uloženého rozpisu. Rozpisy se nyní při vygenerování ukládají se svým datem i časem a nepřepisují se.
+5) Přidáno tlačítko `Uložit rozpis` pro uložení rozpracovaného rozpisu bez nutnosti generování pdf.
+6) Přidáno tlačítko `Vyčistit rozpis`, které smaže všechny absence v rozpise.
+7) Přidáno tlačítko `Zpět`, vrátí poslední změnu učiněnou v rozpise.
