@@ -1,5 +1,6 @@
 import os
 import tkinter as tk
+from tkinter import filedialog
 from tkinter import ttk, messagebox
 from tkcalendar import DateEntry
 import pandas as pd
@@ -177,6 +178,12 @@ start_date_label.grid(row=1, column=0, padx=5, pady=5, sticky="w")
 start_date_entry = DateEntry(frame_info, date_pattern='yyyy-mm-dd')
 start_date_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
 
+def resetovat_datum_do():
+    end_date_entry.delete(0, 'end')
+
+reset_btn = ttk.Button(frame_info, text="Resetovat Datum do", command=resetovat_datum_do)
+reset_btn.grid(row=2, column=2, padx=5, pady=5, sticky="ew")
+
 # Datum do
 end_date_label = ttk.Label(frame_info, text="Datum do:")
 end_date_label.grid(row=2, column=0, padx=5, pady=5, sticky="w")
@@ -198,9 +205,9 @@ absences = {}
 def pridat_nepritomnost():
     doctor = doctor_combo.get()
     start_date = start_date_entry.get_date()
-    end_date = end_date_entry.get_date()
+    end_date = end_date_entry.get_date() if end_date_entry.get() else start_date
     reason = reason_var.get()
-    if doctor and start_date and end_date and reason:
+    if doctor and start_date and reason:
         current_date = start_date
         while current_date <= end_date:
             if current_date not in absences:
@@ -213,10 +220,6 @@ def pridat_nepritomnost():
                 rozpis_data[current_date] = {doctor: reason}
                 
             current_date += datetime.timedelta(days=1)
-        messagebox.showinfo("Info", f"Nepřítomnost doktora {doctor} byla přidána od {start_date} do {end_date}.")
-        print("Po přidání nepřítomnosti:")
-        for date, absence in absences.items():
-            print(f"{date}: {absence}")
         aktualizovat_rozpis(start_date.month)
     else:
         messagebox.showwarning("Varování", "Vyberte doktora, datum a důvod nepřítomnosti.")
@@ -226,19 +229,30 @@ def pridat_nepritomnost():
 def odstranit_nepritomnost():
     doctor = doctor_combo.get()
     start_date = start_date_entry.get_date()
-    end_date = end_date_entry.get_date()
+    end_date = end_date_entry.get_date() if end_date_entry.get() else start_date  # Pokud je pole prázdné, použije se start_date
+
     if doctor and start_date and end_date:
         current_date = start_date
         while current_date <= end_date:
+            # Odstranění z absences
             if current_date in absences and doctor in absences[current_date]:
                 del absences[current_date][doctor]
                 if not absences[current_date]:
                     del absences[current_date]
+            
+            # Odstranění z rozpis_data
+            if current_date in rozpis_data and doctor in rozpis_data[current_date]:
+                del rozpis_data[current_date][doctor]
+                if not rozpis_data[current_date]:
+                    del rozpis_data[current_date]
+
             current_date += datetime.timedelta(days=1)
-        messagebox.showinfo("Info", f"Nepřítomnost doktora {doctor} byla odstraněna od {start_date} do {end_date}.")
+        
+        # Aktualizace zobrazení rozpisu po odstranění
         aktualizovat_rozpis(start_date.month)
     else:
         messagebox.showwarning("Varování", "Vyberte doktora a datum.")
+
 
 pridat_btn = ttk.Button(frame_info, text="Přidat nepřítomnost", command=pridat_nepritomnost)
 pridat_btn.grid(row=8, column=1, padx=5, pady=10, sticky="ew")
@@ -332,6 +346,26 @@ generovat_btn.grid(row=1, column=0, pady=5)
 zobrazit_btn = ttk.Button(frame_rozpis, text="Zobrazit poslední rozpis", command=zobrazit_posledni)
 zobrazit_btn.grid(row=2, column=0, pady=5)
 
+def vybrat_a_nacist_rozpis():
+    file_path = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
+    if file_path:
+        try:
+            with open(file_path, 'r', encoding='utf-8') as file:
+                content = file.read()
+                text.delete('1.0', tk.END)
+                text.insert(tk.END, content)
+                
+                # Aktualizace proměnné absences na základě nově načteného rozpisu
+                nacti_text_ze_souboru()
+        except Exception as e:
+            messagebox.showerror("Chyba", f"Nelze načíst soubor: {e}")
+
+
+#tlacitko pro vybrat rozpis
+vybrat_btn = ttk.Button(frame_rozpis, text="Vybrat rozpis", command=vybrat_a_nacist_rozpis)
+vybrat_btn.grid(row=3, column=0, pady=5)
+
+
 # Zajištění, že hlavní okno se nebude roztahovat s oknem
 root.columnconfigure(0, weight=1)
 root.rowconfigure(1, weight=1)
@@ -351,6 +385,7 @@ def center_text(text, width):
 
 # Inicializace globální proměnné rozpis_data
 rozpis_data = {}
+
 
 def aktualizovat_rozpis(zobrazit_mesic=None):
     global rozpis_data

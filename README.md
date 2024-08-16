@@ -2,38 +2,51 @@
 
 Tato aplikace umožňuje spravovat rozpis doktorů v ambulanci.
 
-# Obsah
 
-Soubor doktoři.txt obsahuje seznam doktorů
-    pro přidání edituj soubor přídáním nového doktora na nový řádek
-    pro odstranění doktora smaž odpovídající řádek
+  - **Poznámka:** v případě divnýho chování jak aplikace tak souborů dej vědět, já aplikaci testoval jak se dalo, vše se zdá v normě.
 
-Při zadání jednodenní nepřítomnost je nutné zadat datum od a datum do stejný den.
+    
+## Obsah
 
-Nepřítomnosti se spolu s celým rozpisem uloží do souboru rozpis.txt pouze v okamžiku generování pdf, ne při každé změně.
-    V případě, že je aplikace ukončena bez vygenerování pdf, zadané nepřítomnosti se neuloží.
+### Soubor `doktoři.txt`
+- Obsahuje seznam doktorů.
+- **Pro přidání:** Edituj soubor přidáním nového doktora na nový řádek.
+- **Pro odstranění:** Smaž odpovídající řádek.
 
-Pomocí tlačítka zobrazit poslední rozpis se do programu nahraje obsah rozpisu (ze souboru rozpis.txt) z okamžiku posledního generování pdf.
+### Nepřítomnosti
+- Při zadání jednodenní nepřítomnosti je nutné zadat stejné datum do polí `Datum od` i `Datum do`.
+- Nepřítomnosti se spolu s celým rozpisem uloží do souboru `rozpis.txt` pouze v okamžiku generování PDF, ne při každé změně.
+  - **Poznámka:** V případě, že je aplikace ukončena bez vygenerování PDF, zadané nepřítomnosti se neuloží.
 
-Tlačítko Generovat rozpis vygeneruje soubor rozpis.pdf se zadanými nepřítomnostmi.
-    název .pdf souboru obsahuje datum a čas vygenerování ve formátu den.mesic.rok_hodina-minuta-vterina
+### Zobrazení posledního rozpisu
+- Pomocí tlačítka `Zobrazit poslední rozpis` se do programu nahraje obsah rozpisu (ze souboru `rozpis.txt`) z okamžiku posledního generování PDF.
 
+### Generování rozpisu
+- Tlačítko `Generovat rozpis` vygeneruje soubor `rozpis.pdf` se zadanými nepřítomnostmi .
+  - **Poznámka:** Název PDF souboru obsahuje datum a čas vygenerování ve formátu `den.mesic.rok_hodina-minuta-vterina`.
 
 ## Instalace
 
-1. Stáhněte si repozitář:
-    ```bash
-    git clone https://github.com/adamlnenicka/ambulance.git
-    cd ambulance
-    ```
+1. **Stáhni si repozitář:**
+    - Klikni na zelenou ikonku `Code` -> `Download ZIP`.
 
-2. Spusťte instalační skript:
-    ```bash
-    install.bat
-    ```
+2. **Extrahuj ZIP:**
+    - Extrahuj tam, kde chceš program mít, třeba na plochu.
+    - Ve složce `dist` je spustitelný soubor `ambulance.exe`.
+    - Pokud chceš jednoduchého zástupce na ploše, stačí pravým tlačítkem kliknout na ambulance.exe (možná shif+pravé tlačítko, tak to mám já) a vytvořit ho na ploše. Pak si můžeš složku se soubory hodit kam chceš, ale závislosti musí zůstat ve složce kde jsou. Pdf se ti tam budou generovat taky.
 
-3. Po dokončení instalace najdete zástupce na ploše.
+3. **Spusť aplikaci:**
+    - Otevři složku `dist` a spusť aplikaci přes soubor `ambulance.exe`, nebo přes vytvořeného zástupce.
 
-## Použití
 
-Spusťte aplikaci kliknutím na zástupce na ploše.
+## **Update 1**
+Opravy:
+1) Odstraněno informační okno při zadání/odstranění nepřítomnosti.
+2) Pro zadání/odstranění jednodenní nepřítomnosti stačí zadat datum dne v poli `Datum od`. 
+
+Nové funkce:
+1) Přidáno tlačítko `Reset datum do` pro reset datumu do (Jelikož standardní mechanismus kalendáře neumožňuje přímo nastavit datum na None pomocí interakce, musíme přidat tlačítko nebo jiný mechanismus pro explicitní resetování).
+2) Přidána funkcionalita aplikace, která umožňuje automaticky generovat záznamy absencí pro každého doktora na základě specifikovaných dnů v souboru `doktoři.txt`.Formát: Soubor `doktoři.txt` má nyní řádky ve formátu jako `JménoDoktora Dny`, kde `Dny` jsou volitelné a jsou to čísla dnů v týdnu, kdy je doktor neustále nepřítomný z důvodu absence.
+Např. řádek `Jára 345` znamená, že Jára bude chybět každou středu, čtvrtek a pátek v měsíci z důvodu absence.
+3) Přidána nabídka pro výběr měsíce.
+4) Přidána funkcionalita pro výběr uloženého rozpisu. Rozpisy se nyní při vygenerování ukládají se svým datem i časem a nepřepisují se.
