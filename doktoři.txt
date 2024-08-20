@@ -1,7 +1,7 @@
-Jára 135
-Lýdia 24
-Vítek 67
-Gabi 135
-Petr 246
-Nasťa 37
-Míša 145
+Jára 2
+Lýdia
+Vítek 12
+Gabi 345
+Petr
+Nasťa
+Míša

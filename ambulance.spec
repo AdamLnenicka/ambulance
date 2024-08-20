@@ -5,7 +5,7 @@ a = Analysis(
     ['ambulance.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('doktoři.txt', '.'), ('grandma.png', '.'), ('DejaVuSans.ttf', '.')],
     hiddenimports=['babel.numbers'],
     hookspath=[],
     hooksconfig={},

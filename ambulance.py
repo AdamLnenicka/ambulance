@@ -1,3 +1,4 @@
+import sys
 import os
 import glob
 import re
@@ -10,12 +11,20 @@ from fpdf import FPDF
 import datetime
 from PIL import Image, ImageTk, ImageOps
 
-# Získání aktuálního adresáře skriptu
-script_dir = os.path.dirname(os.path.abspath(__file__))
+def get_resource_path(relative_path):
+    """Získá absolutní cestu k souboru pro balenou aplikaci nebo během vývoje."""
+    try:
+        # Pokud je aplikace zabalena, bude cesta k souborům uložena v _MEIPASS
+        base_path = sys._MEIPASS
+    except AttributeError:
+        # Během vývoje použijte aktuální adresář skriptu
+        base_path = os.path.abspath(".")
 
-# Cesty k souborům
-doctors_file = os.path.join(script_dir, 'doktoři.txt')
-image_file = os.path.join(script_dir, 'grandma.png')
+    return os.path.join(base_path, relative_path)
+
+# Cesty k souborům s použitím funkce get_resource_path
+doctors_file = get_resource_path('doktoři.txt')
+image_file = get_resource_path('grandma.png')
 
 def generovat_rozpis():
     selected_month = months.index(month_combo.get()) + 1  # Získání aktuálně vybraného měsíce z comboboxu
