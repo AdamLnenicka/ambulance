@@ -3,6 +3,7 @@ import os
 import glob
 import re
 import tkinter as tk
+from babel import numbers
 from tkinter import filedialog
 from tkinter import ttk, messagebox
 from tkcalendar import DateEntry
@@ -10,6 +11,8 @@ import pandas as pd
 from fpdf import FPDF
 import datetime
 from PIL import Image, ImageTk, ImageOps
+
+first_doctor = None
 
 def get_resource_path(relative_path):
     """Získá absolutní cestu k souboru pro balenou aplikaci nebo během vývoje."""
@@ -40,17 +43,37 @@ rozpis_data = {}
 
 # Funkce pro načtení doktorů a nastavení absencí na základě souboru doktoři.txt
 def nacti_doktory():
-    global absences, rozpis_data
+    global absences, rozpis_data, first_doctor
     doctors_list = []
     day_mapping = {'1': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6}  # Mapa čísel na dny v týdnu
     year = datetime.date.today().year
+    first_doctor_absences = set()  # Přidáno pro sledování absencí prvního doktora
+
+    # Seznam státních svátků, kdy se nepracuje
+    statni_svatky = [
+        datetime.date(year, 1, 1),   # Nový rok
+        # Velikonoční svátky jsou pohyblivé
+        datetime.date(year, 5, 1),   # Svátek práce
+        datetime.date(year, 5, 8),   # Den vítězství
+        datetime.date(year, 7, 5),   # Den slovanských věrozvěstů Cyrila a Metoděje
+        datetime.date(year, 7, 6),   # Den upálení mistra Jana Husa
+        datetime.date(year, 9, 28),  # Den české státnosti
+        datetime.date(year, 10, 28), # Den vzniku samostatného československého státu
+        datetime.date(year, 11, 17), # Den boje za svobodu a demokracii
+        datetime.date(year, 12, 24), # Štědrý den
+        datetime.date(year, 12, 25), # 1. svátek vánoční
+        datetime.date(year, 12, 26), # 2. svátek vánoční
+    ]
 
     try:
         with open(doctors_file, 'r', encoding='utf-8') as file:
-            for line in file.readlines():
+            for idx, line in enumerate(file.readlines()):
                 parts = line.strip().split()
                 doctor = parts[0]
                 doctors_list.append(doctor)
+                
+                if idx == 0:  # Uložení prvního doktora
+                    first_doctor = doctor
                 
                 if len(parts) > 1:
                     days_off = parts[1]
@@ -64,20 +87,53 @@ def nacti_doktory():
                                 current_date = first_day_of_month
                                 
                                 while current_date <= last_day_of_month:
-                                    if current_date.weekday() == day_num:
+                                    if current_date.weekday() == day_num or current_date in statni_svatky:
                                         if current_date not in absences:
                                             absences[current_date] = {}
                                         absences[current_date][doctor] = "X"  # Značení absence
+                                        
+                                        if idx == 0:  # Kontrola, zda je to první doktor
+                                            first_doctor_absences.add(current_date)
                                         
                                         if current_date in rozpis_data:
                                             rozpis_data[current_date][doctor] = "X"
                                         else:
                                             rozpis_data[current_date] = {doctor: "X"}
                                     current_date += datetime.timedelta(days=1)
+        
+        # Přidání absence pro víkendy a státní svátky pro všechny doktory, včetně prvního doktora
+        for month in range(1, 13):
+            first_day_of_month = datetime.date(year, month, 1)
+            last_day_of_month = (first_day_of_month.replace(day=28) + datetime.timedelta(days=4)).replace(day=1) - datetime.timedelta(days=1)
+            current_date = first_day_of_month
+            while current_date <= last_day_of_month:
+                if current_date.weekday() >= 5 or current_date in statni_svatky:  # Víkend nebo státní svátek
+                    for doctor in doctors_list:
+                        if current_date not in absences:
+                            absences[current_date] = {}
+                        absences[current_date][doctor] = "X"
+                        if current_date in rozpis_data:
+                            rozpis_data[current_date][doctor] = "X"
+                        else:
+                            rozpis_data[current_date] = {doctor: "X"}
+                else:
+                    if current_date not in absences or first_doctor not in absences[current_date]:
+                        if current_date not in absences:
+                            absences[current_date] = {}
+                        absences[current_date][first_doctor] = "N"
+                        if current_date in rozpis_data:
+                            rozpis_data[current_date][first_doctor] = "N"
+                        else:
+                            rozpis_data[current_date] = {first_doctor: "N"}
+                current_date += datetime.timedelta(days=1)
+
     except FileNotFoundError:
         messagebox.showerror("Chyba", "Soubor 'doktoři.txt' nebyl nalezen.")
     
     return doctors_list
+
+
+
 
 
 # Načtení doktorů a inicializace absencí
@@ -222,8 +278,8 @@ def uloz_do_pdf(data, mesic):
 
             count_slouzi = 0
             for doctor in doctors:
-                # Nastavení šedého pozadí pro sloupec Jára
-                if is_weekend or doctor == "Jára":
+                # Nastavení šedého pozadí pro prvního doktora
+                if is_weekend or doctor == first_doctor:
                     pdf.set_fill_color(211, 211, 211)
                 else:
                     pdf.set_fill_color(255, 255, 255)
@@ -238,12 +294,11 @@ def uloz_do_pdf(data, mesic):
             pdf.cell(cell_width, 8, str(count_slouzi), border=1, align='C', fill=True)
             pdf.ln(8)
 
-    popisek = "Popis symbolů absence: D - Dovolená, S - Po službě, X - Absence, B - Bronchoskopie"
+    popisek = "Popis symbolů absence: D - Dovolená, S - Po službě, X - Absence, N - Ve službě, ale ne v ambulanci"
     pdf.cell(0, 10, popisek, ln=True, align='C')
 
     pdf.output(pdf_filename)
     messagebox.showinfo("Info", f"PDF pro {months[mesic - 1]} bylo úspěšně uloženo jako {pdf_filename}")
-
 
 # Hlavní okno
 root = tk.Tk()
@@ -299,9 +354,15 @@ reset_btn.grid(row=3, column=2, padx=5, pady=5, sticky="ew")
 # Výběr důvodu nepřítomnosti
 reason_label = ttk.Label(frame_info, text="Vyberte důvod nepřítomnosti:")
 reason_label.grid(row=4, column=0, padx=5, pady=5, sticky="w")
+
 reason_var = tk.StringVar(value="")
-reasons = [("Dovolená", "D"), ("Po službě", "S"), ("Absence", "X"), ("Bronchoskopie", "B")]
-for i, (text, mode) in enumerate(reasons):
+
+reasons = [("Dovolená", "D"), ("Po službě", "S"), ("Absence", "X"), ("Ve službě, ale ne na ambulanci", "N")]
+# Umístění prvního rádiového tlačítka na stejný řádek jako popisek
+ttk.Radiobutton(frame_info, text=reasons[0][0], variable=reason_var, value=reasons[0][1]).grid(row=4, column=1, padx=5, pady=5, sticky="w")
+
+# Umístění zbývajících rádiových tlačítek na další řádky
+for i, (text, mode) in enumerate(reasons[1:]):  # začínáme od druhého prvku seznamu
     ttk.Radiobutton(frame_info, text=text, variable=reason_var, value=mode).grid(row=5+i, column=1, padx=5, pady=5, sticky="w")
 
 
@@ -365,10 +426,10 @@ def odstranit_nepritomnost():
 
 # Tlačítka pro přidání a odstranění nepřítomnosti
 pridat_btn = ttk.Button(frame_info, text="Přidat nepřítomnost", command=pridat_nepritomnost)
-pridat_btn.grid(row=8, column=1, padx=5, pady=10, sticky="ew")
+pridat_btn.grid(row=8, column=1, padx=5, pady=5, sticky="ew")
 
 odstranit_btn = ttk.Button(frame_info, text="Odstranit nepřítomnost", command=odstranit_nepritomnost)
-odstranit_btn.grid(row=9, column=1, padx=5, pady=10, sticky="ew")
+odstranit_btn.grid(row=9, column=1, padx=5, pady=5, sticky="ew")
 
 # Frame pro rozpis
 frame_rozpis = ttk.Frame(root, padding="10")
@@ -377,6 +438,9 @@ frame_rozpis.grid(row=1, column=0, sticky="nsew")
 # Textové pole pro zobrazení rozpisu
 text = tk.Text(frame_rozpis, height=20, width=80, font=("Courier New", 12))
 text.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+# Nastavení textového widgetu jako pouze pro čtení
+text.config(state=tk.DISABLED)
 
 # Nastavení pozadí pro víkendy
 text.tag_configure("weekend", background="#D3D3D3")
@@ -606,6 +670,7 @@ def center_text(text, width):
 rozpis_data = {}
 
 
+# Funkce pro aktualizaci rozpisu
 def aktualizovat_rozpis(zobrazit_mesic=None):
     global rozpis_data
     today = datetime.date.today()
@@ -629,7 +694,8 @@ def aktualizovat_rozpis(zobrazit_mesic=None):
             if doctor not in rozpis_data[date_only]:
                 rozpis_data[date_only][doctor] = ""
 
-    # Zobrazení rozpisu
+    # Povolit editaci, vymazat starý obsah, naplnit nový obsah a znovu zakázat editaci
+    text.config(state=tk.NORMAL)  # Povolit editaci
     text.delete('1.0', tk.END)
     header = "Datum".ljust(15) + "".join([center_text(d, 10) for d in doctors]) + center_text("Slouží", 10)
     text.insert(tk.END, header + "\n", "big_font")
@@ -642,15 +708,15 @@ def aktualizovat_rozpis(zobrazit_mesic=None):
                 text.insert(tk.END, day_str.ljust(15), "big_font")
             count_slouzi = 0
             for doctor in doctors:
-                tag = ("big_font", "weekend", "jara") if date.weekday() >= 5 and doctor == "Jára" else \
+                tag = ("big_font", "weekend", "jara") if date.weekday() >= 5 and doctor == first_doctor else \
                       ("big_font", "weekend") if date.weekday() >= 5 else \
-                      ("big_font", "jara") if doctor == "Jára" else "big_font"
+                      ("big_font", "jara") if doctor == first_doctor else "big_font"
                 if rozpis_data[date][doctor] == "":
                     count_slouzi += 1
                 text.insert(tk.END, center_text(rozpis_data[date].get(doctor, ""), 10), tag)
             text.insert(tk.END, center_text(str(count_slouzi), 10), "big_font")
             text.insert(tk.END, "\n")
-
+    text.config(state=tk.DISABLED)  # Znovu zakázat editaci
 
 # Inicializace zobrazení rozpisu při startu aplikace
 text_size = 12
