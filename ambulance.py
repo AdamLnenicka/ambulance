@@ -244,6 +244,7 @@ def uloz_text_do_souboru(zobrazit_mesic):
 
 
 # Uložení textového rozpisu do souboru
+# Funkce pro uložení rozpisu do PDF
 def uloz_do_pdf(data, mesic):
     current_time = datetime.datetime.now().strftime("%d.%m.%Y_%H-%M-%S")
     pdf_filename = f"rozpis_{mesic:02d}_{current_time}.pdf"
@@ -266,20 +267,17 @@ def uloz_do_pdf(data, mesic):
     # Seřadíme dny chronologicky
     for date in sorted(data.keys()):
         if date.month == mesic:
-            # Nastavení šedého pozadí pro víkendy
             is_weekend = date.weekday() >= 5
-            if is_weekend:
-                pdf.set_fill_color(211, 211, 211)
-            else:
-                pdf.set_fill_color(255, 255, 255)
+            pdf.set_fill_color(211, 211, 211) if is_weekend else pdf.set_fill_color(255, 255, 255)
 
             day_str = date.strftime("%d.%m.") + " " + days[date.weekday()]
             pdf.cell(cell_width, 8, day_str, border=1, fill=True)
 
             count_slouzi = 0
             for doctor in doctors:
-                # Nastavení šedého pozadí pro prvního doktora
-                if is_weekend or doctor == first_doctor:
+                # Kontrola, zda je doktor hlavní na základě checkboxu
+                is_main = doctor == first_doctor and is_main_doctor.get()
+                if is_weekend or is_main:
                     pdf.set_fill_color(211, 211, 211)
                 else:
                     pdf.set_fill_color(255, 255, 255)
@@ -289,7 +287,6 @@ def uloz_do_pdf(data, mesic):
                 if absence_value == "":
                     count_slouzi += 1
 
-            # Nastavení bílé barvy zpět pro buňku "Slouží"
             pdf.set_fill_color(255, 255, 255)
             pdf.cell(cell_width, 8, str(count_slouzi), border=1, align='C', fill=True)
             pdf.ln(8)
@@ -299,6 +296,7 @@ def uloz_do_pdf(data, mesic):
 
     pdf.output(pdf_filename)
     messagebox.showinfo("Info", f"PDF pro {months[mesic - 1]} bylo úspěšně uloženo jako {pdf_filename}")
+
 
 # Hlavní okno
 root = tk.Tk()
@@ -330,6 +328,16 @@ doctor_label = ttk.Label(frame_info, text="Vyberte doktora:")
 doctor_label.grid(row=1, column=0, padx=5, pady=5, sticky="w")
 doctor_combo = ttk.Combobox(frame_info, values=doctors)
 doctor_combo.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+
+# Globální proměnná pro sledování stavu hlavního doktora
+is_main_doctor = tk.BooleanVar(value=True)
+
+# Checkbox pro volbu hlavního doktora
+main_doctor_checkbox = ttk.Checkbutton(
+    frame_info, text="Chci prvního doktora ze souboru doktoři jako hlavního", variable=is_main_doctor, command=lambda: aktualizovat_rozpis(zobrazit_mesic=months.index(month_combo.get()) + 1)
+)
+main_doctor_checkbox.grid(row=1, column=2, padx=5, pady=5, sticky="w")
+
 
 # Datum od
 start_date_label = ttk.Label(frame_info, text="Datum od:")
@@ -675,7 +683,7 @@ def aktualizovat_rozpis(zobrazit_mesic=None):
     global rozpis_data
     today = datetime.date.today()
     year = today.year
-    
+
     # Pokud není zadán měsíc, použije se aktuální měsíc
     if zobrazit_mesic is None:
         zobrazit_mesic = today.month
@@ -694,6 +702,20 @@ def aktualizovat_rozpis(zobrazit_mesic=None):
             if doctor not in rozpis_data[date_only]:
                 rozpis_data[date_only][doctor] = ""
 
+    # Zkontrolujeme stav checkboxu (je-li první doktor hlavní) a upravíme hodnoty "N"
+    if is_main_doctor.get():
+        # Pokud je hlavní doktor, přidáme "N" tam, kde nemá absenci
+        for date in dates:
+            date_only = date.date()
+            if first_doctor not in rozpis_data[date_only] or not rozpis_data[date_only][first_doctor]:
+                rozpis_data[date_only][first_doctor] = "N"
+    else:
+        # Pokud hlavní doktor není hlavní, odstraníme "N" tam, kde je
+        for date in dates:
+            date_only = date.date()
+            if first_doctor in rozpis_data[date_only] and rozpis_data[date_only][first_doctor] == "N":
+                rozpis_data[date_only][first_doctor] = ""
+
     # Povolit editaci, vymazat starý obsah, naplnit nový obsah a znovu zakázat editaci
     text.config(state=tk.NORMAL)  # Povolit editaci
     text.delete('1.0', tk.END)
@@ -708,15 +730,18 @@ def aktualizovat_rozpis(zobrazit_mesic=None):
                 text.insert(tk.END, day_str.ljust(15), "big_font")
             count_slouzi = 0
             for doctor in doctors:
-                tag = ("big_font", "weekend", "jara") if date.weekday() >= 5 and doctor == first_doctor else \
+                # Kontrola, zda je zvolen hlavní doktor a zda checkbox je zaškrtnutý
+                is_main = doctor == first_doctor and is_main_doctor.get()
+                tag = ("big_font", "weekend", "jara") if date.weekday() >= 5 and is_main else \
                       ("big_font", "weekend") if date.weekday() >= 5 else \
-                      ("big_font", "jara") if doctor == first_doctor else "big_font"
+                      ("big_font", "jara") if is_main else "big_font"
                 if rozpis_data[date][doctor] == "":
                     count_slouzi += 1
                 text.insert(tk.END, center_text(rozpis_data[date].get(doctor, ""), 10), tag)
             text.insert(tk.END, center_text(str(count_slouzi), 10), "big_font")
             text.insert(tk.END, "\n")
     text.config(state=tk.DISABLED)  # Znovu zakázat editaci
+
 
 # Inicializace zobrazení rozpisu při startu aplikace
 text_size = 12
