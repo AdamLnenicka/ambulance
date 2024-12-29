@@ -31,9 +31,12 @@ image_file = get_resource_path('grandma.png')
 
 def generovat_rozpis():
     selected_month = months.index(month_combo.get()) + 1  # Získání aktuálně vybraného měsíce z comboboxu
+    selected_year = int(year_combo.get())  # Explicitně načteme rok z year_combo
+
     aktualizovat_rozpis(zobrazit_mesic=selected_month)
-    uloz_do_pdf(rozpis_data, selected_month)  # Uložení do PDF jen pro zvolený měsíc
-    uloz_text_do_souboru(selected_month)  # Uložení textového rozpisu jen pro zvolený měsíc
+    uloz_do_pdf(rozpis_data, selected_month, selected_year)  # Předání roku
+    uloz_text_do_souboru(selected_month, selected_year)  # Předání roku
+
 
 # Seznam nepřítomností
 absences = {}
@@ -42,27 +45,28 @@ absences = {}
 rozpis_data = {}
 
 # Funkce pro načtení doktorů a nastavení absencí na základě souboru doktoři.txt
-def nacti_doktory():
+def nacti_doktory(selected_year=None):
     global absences, rozpis_data, first_doctor
     doctors_list = []
     day_mapping = {'1': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6}  # Mapa čísel na dny v týdnu
-    year = datetime.date.today().year
+    if not selected_year:
+        selected_year = datetime.date.today().year
+
     first_doctor_absences = set()  # Přidáno pro sledování absencí prvního doktora
 
-    # Seznam státních svátků, kdy se nepracuje
+    # Seznam státních svátků
     statni_svatky = [
-        datetime.date(year, 1, 1),   # Nový rok
-        # Velikonoční svátky jsou pohyblivé
-        datetime.date(year, 5, 1),   # Svátek práce
-        datetime.date(year, 5, 8),   # Den vítězství
-        datetime.date(year, 7, 5),   # Den slovanských věrozvěstů Cyrila a Metoděje
-        datetime.date(year, 7, 6),   # Den upálení mistra Jana Husa
-        datetime.date(year, 9, 28),  # Den české státnosti
-        datetime.date(year, 10, 28), # Den vzniku samostatného československého státu
-        datetime.date(year, 11, 17), # Den boje za svobodu a demokracii
-        datetime.date(year, 12, 24), # Štědrý den
-        datetime.date(year, 12, 25), # 1. svátek vánoční
-        datetime.date(year, 12, 26), # 2. svátek vánoční
+        datetime.date(selected_year, 1, 1),   # Nový rok
+        datetime.date(selected_year, 5, 1),   # Svátek práce
+        datetime.date(selected_year, 5, 8),   # Den vítězství
+        datetime.date(selected_year, 7, 5),   # Den slovanských věrozvěstů Cyrila a Metoděje
+        datetime.date(selected_year, 7, 6),   # Den upálení mistra Jana Husa
+        datetime.date(selected_year, 9, 28),  # Den české státnosti
+        datetime.date(selected_year, 10, 28), # Den vzniku samostatného československého státu
+        datetime.date(selected_year, 11, 17), # Den boje za svobodu a demokracii
+        datetime.date(selected_year, 12, 24), # Štědrý den
+        datetime.date(selected_year, 12, 25), # 1. svátek vánoční
+        datetime.date(selected_year, 12, 26), # 2. svátek vánoční
     ]
 
     try:
@@ -80,9 +84,8 @@ def nacti_doktory():
                     for day_char in days_off:
                         if day_char in day_mapping:
                             day_num = day_mapping[day_char]
-                            # Aplikace absencí na každý měsíc v roce
                             for month in range(1, 13):
-                                first_day_of_month = datetime.date(year, month, 1)
+                                first_day_of_month = datetime.date(selected_year, month, 1)
                                 last_day_of_month = (first_day_of_month.replace(day=28) + datetime.timedelta(days=4)).replace(day=1) - datetime.timedelta(days=1)
                                 current_date = first_day_of_month
                                 
@@ -91,23 +94,19 @@ def nacti_doktory():
                                         if current_date not in absences:
                                             absences[current_date] = {}
                                         absences[current_date][doctor] = "X"  # Značení absence
-                                        
-                                        if idx == 0:  # Kontrola, zda je to první doktor
-                                            first_doctor_absences.add(current_date)
-                                        
                                         if current_date in rozpis_data:
                                             rozpis_data[current_date][doctor] = "X"
                                         else:
                                             rozpis_data[current_date] = {doctor: "X"}
                                     current_date += datetime.timedelta(days=1)
         
-        # Přidání absence pro víkendy a státní svátky pro všechny doktory, včetně prvního doktora
+        # Absence pro víkendy a státní svátky pro všechny doktory
         for month in range(1, 13):
-            first_day_of_month = datetime.date(year, month, 1)
+            first_day_of_month = datetime.date(selected_year, month, 1)
             last_day_of_month = (first_day_of_month.replace(day=28) + datetime.timedelta(days=4)).replace(day=1) - datetime.timedelta(days=1)
             current_date = first_day_of_month
             while current_date <= last_day_of_month:
-                if current_date.weekday() >= 5 or current_date in statni_svatky:  # Víkend nebo státní svátek
+                if current_date.weekday() >= 5 or current_date in statni_svatky:
                     for doctor in doctors_list:
                         if current_date not in absences:
                             absences[current_date] = {}
@@ -116,15 +115,6 @@ def nacti_doktory():
                             rozpis_data[current_date][doctor] = "X"
                         else:
                             rozpis_data[current_date] = {doctor: "X"}
-                else:
-                    if current_date not in absences or first_doctor not in absences[current_date]:
-                        if current_date not in absences:
-                            absences[current_date] = {}
-                        absences[current_date][first_doctor] = "N"
-                        if current_date in rozpis_data:
-                            rozpis_data[current_date][first_doctor] = "N"
-                        else:
-                            rozpis_data[current_date] = {first_doctor: "N"}
                 current_date += datetime.timedelta(days=1)
 
     except FileNotFoundError:
@@ -133,16 +123,10 @@ def nacti_doktory():
     return doctors_list
 
 
-
-
-
 # Načtení doktorů a inicializace absencí
 doctors = nacti_doktory()
 
-# Zobrazení posledního rozpisu
-import glob
-import re
-
+# Funkce pro zobrazení posledního rozpisu
 def zobrazit_posledni():
     try:
         # Najdeme všechny soubory, které odpovídají vzoru rozpis_*.txt
@@ -152,29 +136,40 @@ def zobrazit_posledni():
             messagebox.showinfo("Info", "Žádný uložený rozpis nebyl nalezen.")
             return
         
-        # Seřadíme soubory podle času vytvoření a vybereme poslední
-        posledni_soubor = max(soubory, key=os.path.getctime)
+        # Extrahujeme měsíc, rok a datum editace
+        rozpis_soubory = []
+        for soubor in soubory:
+            match = re.search(r'rozpis_(\d{2})_(\d{4})_(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})', soubor)
+            if match:
+                mesic = int(match.group(1))
+                rok = int(match.group(2))
+                datum_editace = match.group(3)
+                rozpis_soubory.append((datum_editace, rok, mesic, soubor))
         
-        # Načteme a analyzujeme obsah posledního souboru
+        if not rozpis_soubory:
+            messagebox.showinfo("Info", "Žádný platný rozpis nebyl nalezen.")
+            return
+        
+        # Seřadíme soubory podle data a času editace (sestupně)
+        rozpis_soubory.sort(reverse=True, key=lambda x: x[0])
+        
+        # Vybereme nejnovější soubor
+        _, nejnovější_rok, nejnovější_mesic, posledni_soubor = rozpis_soubory[0]
+        
+        # Načteme obsah posledního souboru
         with open(posledni_soubor, 'r', encoding='utf-8') as file:
             content = file.read()
+            text.config(state=tk.NORMAL)
             text.delete('1.0', tk.END)
             text.insert(tk.END, content)
+            text.config(state=tk.DISABLED)
         
-        # Extrahujeme datumy z rozpisu pomocí regexu a najdeme měsíc, pro který je rozpis určen
-        data = re.findall(r'(\d{2})\.(\d{2})\.', content)
-        if data:
-            mesice = {int(mesic) for _, mesic in data}  # Extrahujeme všechny měsíce
-            if len(mesice) == 1:
-                zvoleny_mesic = mesice.pop()  # Pokud je pouze jeden měsíc, použijeme ho
-            else:
-                zvoleny_mesic = min(mesice)  # Pokud je více měsíců, vybereme první (např. září v případě srpen-září)
-
-            # Přepnutí comboboxu na zvolený měsíc
-            month_combo.current(zvoleny_mesic - 1)
-            
-            # Aktualizujeme rozpis pro zvolený měsíc
-            aktualizovat_rozpis(zobrazit_mesic=zvoleny_mesic)
+        # Nastavíme comboboxy
+        year_combo.set(nejnovější_rok)
+        month_combo.current(nejnovější_mesic - 1)
+        
+        # Aktualizujeme rozpis
+        aktualizovat_rozpis(zobrazit_mesic=nejnovější_mesic)
     
     except Exception as e:
         messagebox.showerror("Chyba", f"Nelze načíst poslední rozpis: {e}")
@@ -231,23 +226,32 @@ def nacti_text_ze_souboru():
 
 
 # Funkce pro uložení rozpisu do textového souboru
-def uloz_text_do_souboru(zobrazit_mesic):
-    current_time = datetime.datetime.now().strftime("%d.%m.%Y_%H-%M-%S")
-    text_filename = f"rozpis_{zobrazit_mesic:02d}_{current_time}.txt"
+def uloz_text_do_souboru(zobrazit_mesic, selected_year):
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")  # Datum a čas uložení souboru
+    
+    # Správný formát názvu souboru
+    text_filename = f"rozpis_{zobrazit_mesic:02d}_{selected_year}_{current_time}.txt"
 
-    with open(text_filename, 'w', encoding='utf-8') as file:
-        lines = text.get('1.0', tk.END).splitlines()
-        for line in lines:
-            if f".{zobrazit_mesic:02d}." in line:  # Uložíme jen řádky odpovídající zvolenému měsíci
-                file.write(line + "\n")
-    messagebox.showinfo("Info", f"Rozpis pro {months[zobrazit_mesic - 1]} byl úspěšně uložen jako {text_filename}")
+    try:
+        with open(text_filename, 'w', encoding='utf-8') as file:
+            lines = text.get('1.0', tk.END).splitlines()
+            for line in lines:
+                if f".{zobrazit_mesic:02d}." in line:  # Uložíme jen řádky odpovídající zvolenému měsíci
+                    file.write(line + "\n")
+        messagebox.showinfo(
+            "Info",
+            f"Rozpis pro {months[zobrazit_mesic - 1]} {selected_year} byl úspěšně uložen jako {text_filename}"
+        )
+    except Exception as e:
+        messagebox.showerror("Chyba", f"Nepodařilo se uložit soubor: {e}")
+
 
 
 # Uložení textového rozpisu do souboru
 # Funkce pro uložení rozpisu do PDF
-def uloz_do_pdf(data, mesic):
-    current_time = datetime.datetime.now().strftime("%d.%m.%Y_%H-%M-%S")
-    pdf_filename = f"rozpis_{mesic:02d}_{current_time}.pdf"
+def uloz_do_pdf(data, mesic, selected_year):
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    pdf_filename = f"rozpis_{mesic:02d}_{selected_year}_{current_time}.pdf"
 
     pdf = FPDF(format='A4')
     pdf.add_page()
@@ -258,15 +262,16 @@ def uloz_do_pdf(data, mesic):
     table_width = pdf.w - 2 * margin
     cell_width = table_width / (len(doctors) + 2)
 
+    # Hlavička tabulky
     pdf.cell(cell_width, 8, "", border=1)
     for doctor in doctors:
         pdf.cell(cell_width, 8, doctor, border=1, align='C')
     pdf.cell(cell_width, 8, "Slouží", border=1, align='C')
     pdf.ln(8)
 
-    # Seřadíme dny chronologicky
+    # Řádky s daty
     for date in sorted(data.keys()):
-        if date.month == mesic:
+        if date.month == mesic and date.year == selected_year:
             is_weekend = date.weekday() >= 5
             pdf.set_fill_color(211, 211, 211) if is_weekend else pdf.set_fill_color(255, 255, 255)
 
@@ -275,39 +280,64 @@ def uloz_do_pdf(data, mesic):
 
             count_slouzi = 0
             for doctor in doctors:
-                # Kontrola, zda je doktor hlavní na základě checkboxu
-                is_main = doctor == first_doctor and is_main_doctor.get()
-                if is_weekend or is_main:
-                    pdf.set_fill_color(211, 211, 211)
-                else:
-                    pdf.set_fill_color(255, 255, 255)
-
                 absence_value = data[date].get(doctor, "")
+
+                # Podmínka pro zašedění hlavního doktora
+                if is_main_doctor.get() and doctor == first_doctor:
+                    pdf.set_fill_color(211, 211, 211)  # Šedá barva pro hlavního doktora
+                elif is_weekend:
+                    pdf.set_fill_color(211, 211, 211)  # Šedá barva pro víkend
+                else:
+                    pdf.set_fill_color(255, 255, 255)  # Bílá pro běžné dny
+
                 pdf.cell(cell_width, 8, absence_value, border=1, align='C', fill=True)
+                
                 if absence_value == "":
                     count_slouzi += 1
 
-            pdf.set_fill_color(255, 255, 255)
             pdf.cell(cell_width, 8, str(count_slouzi), border=1, align='C', fill=True)
             pdf.ln(8)
 
+    # Popis symbolů
     popisek = "Popis symbolů absence: D - Dovolená, S - Po službě, X - Absence, N - Ve službě, ale ne v ambulanci"
     pdf.cell(0, 10, popisek, ln=True, align='C')
 
+    # Uložení PDF souboru
     pdf.output(pdf_filename)
-    messagebox.showinfo("Info", f"PDF pro {months[mesic - 1]} bylo úspěšně uloženo jako {pdf_filename}")
+    messagebox.showinfo("Info", f"PDF pro {months[mesic - 1]} {selected_year} bylo úspěšně uloženo jako {pdf_filename}")
 
 
 # Hlavní okno
 root = tk.Tk()
 root.title("Aplikace pro ambulanci")
-root.geometry("1250x1000")
+root.geometry("1600x1200")
 
 # Frame pro základní informace
 frame_info = ttk.Frame(root, padding="10")
 frame_info.grid(row=0, column=0, sticky="ew")
 
 months = ["Leden", "Únor", "Březen", "Duben", "Květen", "Červen", "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec"]
+
+# Výběr roku
+#year_label = ttk.Label(frame_info, text="Vyberte rok:")
+#year_label.grid(row=0, column=2, padx=5, pady=5, sticky="w")
+
+
+def on_year_change(event):
+    selected_year = int(year_combo.get())
+    global doctors
+    absences.clear()
+    rozpis_data.clear()
+    doctors = nacti_doktory(selected_year)  # Načteme doktory pro nový rok
+    selected_month = months.index(month_combo.get()) + 1
+    aktualizovat_rozpis(zobrazit_mesic=selected_month)
+
+
+current_year = datetime.date.today().year
+year_combo = ttk.Combobox(frame_info, values=[current_year, current_year + 1])
+year_combo.grid(row=0, column=2, padx=5, pady=5, sticky="ew")
+year_combo.current(0)  # Přednastavíme aktuální rok
+year_combo.bind("<<ComboboxSelected>>", on_year_change)
 
 # Funkce pro zpracování změny měsíce
 def on_month_change(event):
@@ -532,15 +562,25 @@ frame_rozpis.rowconfigure(0, weight=1)
 # Funkce pro uložení rozpracovaného rozpisu
 def ulozit_rozpis():
     selected_month = months.index(month_combo.get()) + 1  # Získání aktuálně vybraného měsíce z comboboxu
-    current_time = datetime.datetime.now().strftime("%d.%m.%Y_%H-%M-%S")
-    text_filename = f"rozpis_{selected_month:02d}_{current_time}.txt"
+    selected_year = int(year_combo.get())  # Explicitně načteme rok z year_combo
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")  # Datum a čas uložení souboru
+    
+    # Správný formát názvu souboru
+    text_filename = f"rozpis_{selected_month:02d}_{selected_year}_{current_time}.txt"
 
-    with open(text_filename, 'w', encoding='utf-8') as file:
-        lines = text.get('1.0', tk.END).splitlines()
-        for line in lines:
-            if f".{selected_month:02d}." in line:  # Uložíme jen řádky odpovídající zvolenému měsíci
-                file.write(line + "\n")
-    messagebox.showinfo("Info", f"Rozpis pro {months[selected_month - 1]} byl úspěšně uložen jako {text_filename}")
+    try:
+        with open(text_filename, 'w', encoding='utf-8') as file:
+            lines = text.get('1.0', tk.END).splitlines()
+            for line in lines:
+                if f".{selected_month:02d}." in line:  # Uložíme jen řádky odpovídající zvolenému měsíci
+                    file.write(line + "\n")
+        messagebox.showinfo(
+            "Info",
+            f"Rozpis pro {months[selected_month - 1]} {selected_year} byl úspěšně uložen jako {text_filename}"
+        )
+    except Exception as e:
+        messagebox.showerror("Chyba", f"Nepodařilo se uložit soubor: {e}")
+
 
 # Přidání tlačítka pro uložení rozpracovaného rozpisu
 ulozit_btn = ttk.Button(frame_rozpis, text="Uložit rozpis", command=ulozit_rozpis)
@@ -681,19 +721,18 @@ rozpis_data = {}
 # Funkce pro aktualizaci rozpisu
 def aktualizovat_rozpis(zobrazit_mesic=None):
     global rozpis_data
+    selected_year = int(year_combo.get())  # Získáme vybraný rok
     today = datetime.date.today()
-    year = today.year
 
-    # Pokud není zadán měsíc, použije se aktuální měsíc
     if zobrazit_mesic is None:
         zobrazit_mesic = today.month
 
-    # Vytvoření rozsahu pro zobrazení zvoleného měsíce
-    start_date = datetime.date(year, zobrazit_mesic, 1)
+    # Vytvoření rozsahu pro zobrazení zvoleného měsíce a roku
+    start_date = datetime.date(selected_year, zobrazit_mesic, 1)
     end_date = (start_date.replace(day=28) + datetime.timedelta(days=4)).replace(day=1) - datetime.timedelta(days=1)
     dates = pd.date_range(start_date, end_date).to_pydatetime()
 
-    # Zajistíme, že pro každý den jsou inicializovány údaje o absencích
+    # Inicializace dat pro všechny doktory v zvoleném roce a měsíci
     for date in dates:
         date_only = date.date()
         if date_only not in rozpis_data:
@@ -702,27 +741,25 @@ def aktualizovat_rozpis(zobrazit_mesic=None):
             if doctor not in rozpis_data[date_only]:
                 rozpis_data[date_only][doctor] = ""
 
-    # Zkontrolujeme stav checkboxu (je-li první doktor hlavní) a upravíme hodnoty "N"
+    # Kontrola a aktualizace hlavního doktora
     if is_main_doctor.get():
-        # Pokud je hlavní doktor, přidáme "N" tam, kde nemá absenci
         for date in dates:
             date_only = date.date()
             if first_doctor not in rozpis_data[date_only] or not rozpis_data[date_only][first_doctor]:
                 rozpis_data[date_only][first_doctor] = "N"
     else:
-        # Pokud hlavní doktor není hlavní, odstraníme "N" tam, kde je
         for date in dates:
             date_only = date.date()
             if first_doctor in rozpis_data[date_only] and rozpis_data[date_only][first_doctor] == "N":
                 rozpis_data[date_only][first_doctor] = ""
 
-    # Povolit editaci, vymazat starý obsah, naplnit nový obsah a znovu zakázat editaci
+    # Aktualizace zobrazení rozpisu v GUI
     text.config(state=tk.NORMAL)  # Povolit editaci
     text.delete('1.0', tk.END)
     header = "Datum".ljust(15) + "".join([center_text(d, 10) for d in doctors]) + center_text("Slouží", 10)
     text.insert(tk.END, header + "\n", "big_font")
     for date in sorted(rozpis_data):
-        if date.month == zobrazit_mesic:
+        if date.month == zobrazit_mesic and date.year == selected_year:
             day_str = date.strftime("%d.%m.") + " " + days[date.weekday()]
             if date.weekday() >= 5:  # Víkendy
                 text.insert(tk.END, day_str.ljust(15), ("big_font", "weekend"))
@@ -730,7 +767,6 @@ def aktualizovat_rozpis(zobrazit_mesic=None):
                 text.insert(tk.END, day_str.ljust(15), "big_font")
             count_slouzi = 0
             for doctor in doctors:
-                # Kontrola, zda je zvolen hlavní doktor a zda checkbox je zaškrtnutý
                 is_main = doctor == first_doctor and is_main_doctor.get()
                 tag = ("big_font", "weekend", "jara") if date.weekday() >= 5 and is_main else \
                       ("big_font", "weekend") if date.weekday() >= 5 else \
@@ -743,14 +779,35 @@ def aktualizovat_rozpis(zobrazit_mesic=None):
     text.config(state=tk.DISABLED)  # Znovu zakázat editaci
 
 
+
 # Inicializace zobrazení rozpisu při startu aplikace
 text_size = 12
-doctors = nacti_doktory()
 
-# Zajištění, že se zobrazí aktuální měsíc při spuštění
-current_month = datetime.date.today().month
-aktualizovat_rozpis(zobrazit_mesic=current_month)
-month_combo.current(current_month - 1)  # Nastavení comboboxu na aktuální měsíc
+# Získání aktuálního data
+today = datetime.date.today()
+
+# Určení následujícího měsíce a roku
+if today.month == 12:
+    # Pokud je prosinec, posuneme se na leden následujícího roku
+    default_month = 1  # Leden
+    default_year = today.year + 1  # Následující rok
+else:
+    # Jinak jen posuneme měsíc a rok zůstane stejný
+    default_month = today.month + 1
+    default_year = today.year
+
+# Nastavení roku v ComboBoxu
+year_combo.set(default_year)  # Nastavení na následující rok, pokud je prosinec
+year_combo.event_generate("<<ComboboxSelected>>")  # Vygenerování události pro aktualizaci roku
+
+# Načtení doktorů pro vybraný rok
+doctors = nacti_doktory(selected_year=default_year)
+
+# Nastavení měsíce v ComboBoxu
+month_combo.current(default_month - 1)  # Nastavení následujícího měsíce (indexace od 0)
+
+# Aktualizace rozpisu pro následující měsíc a rok
+aktualizovat_rozpis(zobrazit_mesic=default_month)
 
 # Nastavení prázdné hodnoty pro datum při startu aplikace
 start_date_entry.delete(0, 'end')
